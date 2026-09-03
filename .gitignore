@@ -1,0 +1,12 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# artefact created by 02_shell_scripting/shellscript.sh
+02_shell_scripting/hello/
