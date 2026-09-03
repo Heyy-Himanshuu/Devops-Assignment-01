@@ -173,7 +173,8 @@ a feature branch that is not ready to merge. **When not to:** as a substitute fo
 cherry-picking leaves duplicate commits with different SHAs on both branches, which makes later
 merges harder to reason about.
 
-The `cherry` branch is kept in this repository so the two histories can be compared:
+The `cherry` branch is kept locally rather than pushed, since only commit 5 was ever meant to reach
+`main`. To see both histories side by side in the local clone:
 
 ```bash
 git log --oneline --graph --all
