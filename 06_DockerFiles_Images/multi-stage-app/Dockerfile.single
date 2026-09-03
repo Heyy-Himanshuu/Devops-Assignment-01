@@ -1,0 +1,9 @@
+# Single-stage build, kept only for the image-size comparison in submission.md.
+# Everything needed to build stays in the final image: dev dependencies, npm cache, sources.
+FROM node:24-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]
