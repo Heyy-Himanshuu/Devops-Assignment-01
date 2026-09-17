@@ -1,8 +1,8 @@
 # DevOps Assignment 1
 
 Solutions for the DevOps assignment: Linux fundamentals, shell scripting, networking, Git, Docker,
-Dockerfiles/images, Docker networking & storage, and the three Kubernetes sessions — fundamentals,
-core objects & deployment strategies, and networking & Services.
+Dockerfiles/images, Docker networking & storage, and the four Kubernetes sessions — fundamentals,
+core objects & deployment strategies, networking & Services, and Ingress/ConfigMaps/Secrets.
 
 Every command output in this repository was captured from a real run on macOS 15 (Apple Silicon)
 with Docker Desktop 29.2.0 — nothing is transcribed from memory. The Kubernetes tasks were run
@@ -23,6 +23,7 @@ a terminal screenshot alongside its output.
 | 8 | Kubernetes Fundamentals | [`08_Kubernetes_Fundamentals/README.md`](./08_Kubernetes_Fundamentals/README.md) |
 | 9 | Kubernetes Pods, ReplicaSets & Deployments | [`09_K8s_Pods_ReplicaSets_Deployments/README.md`](./09_K8s_Pods_ReplicaSets_Deployments/README.md) |
 | 10 | Kubernetes Networking & Services | [`10_K8s_Networking_Services/README.md`](./10_K8s_Networking_Services/README.md) |
+| 11 | Kubernetes Ingress, ConfigMaps & Secrets | [`11_K8s_Ingress_ConfigMaps_Secrets/README.md`](./11_K8s_Ingress_ConfigMaps_Secrets/README.md) |
 
 ## Task summary
 
@@ -63,6 +64,12 @@ three probe types, init containers, sidecars and graceful termination.
 LoadBalancer, ExternalName, headless) proven with real traffic on a 3-node cluster, including a
 broken manifest found in the course repo, diagnosed and fixed.
 
+**11. Kubernetes Ingress, ConfigMaps & Secrets** — config and credentials kept outside the image
+and injected as environment variables, plus one Ingress routing by path, by hostname and over
+HTTPS. Two more real bugs in the course manifests found and fixed here: an Ingress pointing at
+services that do not exist, and a TLS certificate whose `CN` covers none of the hostnames it
+serves — which `curl -k` hid completely.
+
 ## Running the Docker tasks
 
 ```bash
@@ -83,12 +90,18 @@ creates.
 
 ## Running the Kubernetes tasks
 
-Tasks 8–10 need a running cluster. The exact cluster used for every screenshot in this repository
+Tasks 8–11 need a running cluster. The exact cluster used for every screenshot in this repository
 is one control-plane node plus two workers, with the labs' node ports published to the host:
 
 ```bash
 kind create cluster --config kind-config.yaml   # see 08_Kubernetes_Fundamentals/submission.md
 kubectl get nodes
+
+# Task 11 additionally needs an ingress controller (the kind equivalent of
+# `minikube addons enable ingress`):
+kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
+kubectl wait --namespace ingress-nginx --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller --timeout=180s
 
 # then, from any lab folder, e.g.
 cd 10_K8s_Networking_Services/01-clusterip

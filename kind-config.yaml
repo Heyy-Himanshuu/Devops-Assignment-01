@@ -11,6 +11,7 @@ nodes:
         node-labels: "ingress-ready=true"
   extraPortMappings:
   - {containerPort: 80,    hostPort: 8080,  protocol: TCP}
+  - {containerPort: 443,   hostPort: 8443,  protocol: TCP}
   - {containerPort: 30010, hostPort: 30010, protocol: TCP}
   - {containerPort: 30020, hostPort: 30020, protocol: TCP}
   - {containerPort: 30030, hostPort: 30030, protocol: TCP}
