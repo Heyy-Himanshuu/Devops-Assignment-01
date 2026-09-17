@@ -1,10 +1,13 @@
 # DevOps Assignment 1
 
-Solutions for the seven-task DevOps assignment: Linux fundamentals, shell scripting, networking,
-Git, Docker, Dockerfiles/images, and Docker networking & storage.
+Solutions for the DevOps assignment: Linux fundamentals, shell scripting, networking, Git, Docker,
+Dockerfiles/images, Docker networking & storage, and the three Kubernetes sessions — fundamentals,
+core objects & deployment strategies, and networking & Services.
 
 Every command output in this repository was captured from a real run on macOS 15 (Apple Silicon)
-with Docker Desktop 29.2.0 — nothing is transcribed from memory.
+with Docker Desktop 29.2.0 — nothing is transcribed from memory. The Kubernetes tasks were run
+against a live 3-node `kind` cluster (Kubernetes v1.35.0), and every command in them is captured as
+a terminal screenshot alongside its output.
 
 ## Contents
 
@@ -17,6 +20,9 @@ with Docker Desktop 29.2.0 — nothing is transcribed from memory.
 | 5 | Docker Fundamentals | [`05_Docker_Fundamental/`](./05_Docker_Fundamental) — 6 apps, [output](./05_Docker_Fundamental/output.md) |
 | 6 | Dockerfiles & Images | [`06_DockerFiles_Images/submission.md`](./06_DockerFiles_Images/submission.md) |
 | 7 | Docker Networking & Storage | [`07_Docker_Networking/readme.md`](./07_Docker_Networking/readme.md) |
+| 8 | Kubernetes Fundamentals | [`08_Kubernetes_Fundamentals/README.md`](./08_Kubernetes_Fundamentals/README.md) |
+| 9 | Kubernetes Pods, ReplicaSets & Deployments | [`09_K8s_Pods_ReplicaSets_Deployments/README.md`](./09_K8s_Pods_ReplicaSets_Deployments/README.md) |
+| 10 | Kubernetes Networking & Services | [`10_K8s_Networking_Services/README.md`](./10_K8s_Networking_Services/README.md) |
 
 ## Task summary
 
@@ -43,6 +49,20 @@ against the equivalent single-stage image and an explanation of when the techniq
 `host` network mode (and why it behaves differently on macOS), a bind mount updated live, and a real
 overlay network with a two-replica swarm service on it.
 
+**8. Kubernetes Fundamentals** — the control-plane/worker split, every `kube-system` component that
+actually runs the cluster, namespaces and the API surface, and a first Pod created both
+imperatively and declaratively — ending on why a bare Pod is not enough.
+
+**9. Kubernetes Pods, ReplicaSets & Deployments** — all four deployment strategies (rolling update,
+blue-green, canary, recreate) with live traffic sampled *during* each switchover, so the downtime
+difference between them is measured rather than asserted. Plus every Pod lifecycle phase and failure
+mode reproduced on purpose: Pending, Succeeded, Failed, CrashLoopBackOff, ImagePullBackOff, all
+three probe types, init containers, sidecars and graceful termination.
+
+**10. Kubernetes Networking & Services** — all five Service types (ClusterIP, NodePort,
+LoadBalancer, ExternalName, headless) proven with real traffic on a 3-node cluster, including a
+broken manifest found in the course repo, diagnosed and fixed.
+
 ## Running the Docker tasks
 
 ```bash
@@ -60,3 +80,21 @@ curl http://localhost:8080
 
 Each task's document ends with the cleanup commands for the containers, networks and images it
 creates.
+
+## Running the Kubernetes tasks
+
+Tasks 8–10 need a running cluster. The exact cluster used for every screenshot in this repository
+is one control-plane node plus two workers, with the labs' node ports published to the host:
+
+```bash
+kind create cluster --config kind-config.yaml   # see 08_Kubernetes_Fundamentals/submission.md
+kubectl get nodes
+
+# then, from any lab folder, e.g.
+cd 10_K8s_Networking_Services/01-clusterip
+kubectl apply -f manifests/app-deployment.yaml
+kubectl apply -f manifests/service.yaml
+```
+
+Each lab's `submission.md` lists its commands in order and ends with its own cleanup step, so labs
+can be run independently and in any order.
