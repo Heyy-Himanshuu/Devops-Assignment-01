@@ -7,7 +7,7 @@ spendboard:
     replicas: 2
   config:
     environment: gitops-local
-    monthlyBudget: "25000"
+    monthlyBudget: "30000"
   ingress:
     host: spendboard-gitops.local
   hpa:
