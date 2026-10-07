@@ -1,1 +1,9 @@
 # Fingerprints of findings that were reviewed: commit:file:rule:line
+#
+# da56969 hardcoded PAYMENT_API_KEY in app/config.py (Session 17 gate demo).
+# Deleting the line in a later commit does NOT remove it from git history, so the
+# scan of history keeps failing until the finding is triaged. Real-world order:
+#   1. revoke/rotate the key at the provider (here: fabricated, never valid)
+#   2. move it to a secret store / env var (done in the commit that adds this line)
+#   3. record the fingerprint so history scans pass, or rewrite history if required
+da569699bd0e923f8163fddfdfa83840e80bb8f0:16_DevSecOps/devsecops-app/app/config.py:generic-api-key:7

@@ -1,8 +1,5 @@
-"""Payment provider settings.
+"""Payment provider settings - credentials come from the environment, never from source."""
+import os
 
-SESSION 17 DEMO: the key below is a fabricated value planted on purpose to show the
-secret-scanning gate blocking a commit. It is not, and never was, a real credential.
-"""
-
-PAYMENT_API_KEY = "pk_8Gx2Qm7Vt4Rz9Lw3Nb6Hc1Ys5Dk0Fj"
-PAYMENT_TIMEOUT_SECONDS = 5
+PAYMENT_API_KEY = os.environ.get("PAYMENT_API_KEY", "")
+PAYMENT_TIMEOUT_SECONDS = int(os.environ.get("PAYMENT_TIMEOUT_SECONDS", "5"))
