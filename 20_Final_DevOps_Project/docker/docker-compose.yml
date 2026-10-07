@@ -1,0 +1,47 @@
+# Full local stack:  docker compose -f docker/docker-compose.yml up --build
+# (run from 20_Final_DevOps_Project/). UI on http://localhost:3000, API on http://localhost:8000/docs
+name: spendboard
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: spendboard
+      POSTGRES_USER: spendboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spendboard -d spendboard"]
+      interval: 3s
+      retries: 20
+
+  migrate:
+    build: { context: ../application/backend, dockerfile: ../../docker/backend.Dockerfile }
+    image: spendboard-backend:local
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend-env
+      DATABASE_URL: postgresql+psycopg://spendboard:${POSTGRES_PASSWORD:-local-dev-only}@postgres:5432/spendboard
+      ENVIRONMENT: compose
+      CURRENCY: INR
+      MONTHLY_BUDGET: "25000"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  backend:
+    image: spendboard-backend:local
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    ports: ["8000:8000"]
+
+  frontend:
+    build: { context: ../application/frontend, dockerfile: ../../docker/frontend.Dockerfile }
+    image: spendboard-frontend:local
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on: [backend]
+    ports: ["3000:8080"]
+
+volumes:
+  pgdata:

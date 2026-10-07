@@ -1,0 +1,10 @@
+# Shared by the SCA (trivy fs) and container image (trivy image) scans.
+severity:
+  - HIGH
+  - CRITICAL
+exit-code: 1               # without this Trivy only reports; it never fails the job
+scan:
+  scanners:
+    - vuln
+vulnerability:
+  ignore-unfixed: true     # must be nested under `vulnerability:` - a top-level key is silently ignored

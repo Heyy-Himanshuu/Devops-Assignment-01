@@ -1,0 +1,71 @@
+{{- if .Values.postgres.enabled }}
+{{- $fullname := include "spendboard.fullname" . -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-postgres-data
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep   # `helm uninstall` must not delete the data
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.postgres.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests: { storage: {{ .Values.postgres.storage }} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-postgres
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  strategy: { type: Recreate }   # RWO volume: the old Pod must release it before the new one mounts it
+  selector:
+    matchLabels: {{- include "spendboard.selector" (dict "root" . "component" "postgres") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "spendboard.selector" (dict "root" . "component" "postgres") | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          imagePullPolicy: IfNotPresent
+          ports: [{ name: postgres, containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_DB, value: {{ .Values.database.name | quote }} }
+            - { name: POSTGRES_USER, value: {{ .Values.database.user | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.database.existingSecret }}, key: {{ .Values.database.passwordKey }} }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }   # subdir: volume roots may contain lost+found
+          readinessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: {{ $fullname }}-postgres-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-postgres
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  selector: {{- include "spendboard.selector" (dict "root" . "component" "postgres") | nindent 4 }}
+  ports:
+    - { name: postgres, port: 5432, targetPort: postgres }
+{{- end }}

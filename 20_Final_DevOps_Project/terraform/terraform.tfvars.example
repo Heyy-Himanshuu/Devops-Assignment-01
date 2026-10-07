@@ -1,0 +1,6 @@
+# cp terraform.tfvars.example terraform.tfvars   (terraform.tfvars is git-ignored)
+project        = "spendboard"
+environment    = "dev"
+aws_region     = "ap-south-1"
+use_localstack = true
+enable_eks     = false

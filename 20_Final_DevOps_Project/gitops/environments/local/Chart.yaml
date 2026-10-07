@@ -1,0 +1,11 @@
+# Thin "environment" chart: pins the app chart from this repo and holds only what differs per
+# environment (values.yaml). The CI pipeline's last job rewrites spendboard.image.tag here.
+apiVersion: v2
+name: spendboard-local
+description: SpendBoard as deployed to the long-lived local kind cluster, reconciled by Argo CD
+type: application
+version: 0.1.0
+dependencies:
+  - name: spendboard
+    version: 1.0.0
+    repository: file://../../../helm/spendboard

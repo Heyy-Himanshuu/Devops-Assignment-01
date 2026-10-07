@@ -1,0 +1,3 @@
+# `helm dependency build` output - Argo CD rebuilds it from the file:// dependency
+charts/
+Chart.lock

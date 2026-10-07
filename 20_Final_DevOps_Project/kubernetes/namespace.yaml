@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: s21-spendboard
+  labels:
+    app.kubernetes.io/part-of: spendboard
+    # Enforce the "restricted" Pod Security Standard for everything except Postgres' first-boot chown
+    pod-security.kubernetes.io/warn: restricted

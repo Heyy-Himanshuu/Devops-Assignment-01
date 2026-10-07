@@ -1,0 +1,10 @@
+# Local kind cluster (devops-hw): images imported straight into the nodes with `ctr import`.
+image:
+  backend: spendboard-backend
+  frontend: spendboard-frontend
+  tag: local
+  pullPolicy: Never
+config:
+  environment: kind-local
+serviceMonitor:
+  enabled: true

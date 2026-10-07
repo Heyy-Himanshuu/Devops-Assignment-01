@@ -1,0 +1,16 @@
+spendboard:
+  image:
+    tag: "local"
+  backend:
+    replicas: 2
+  frontend:
+    replicas: 2
+  config:
+    environment: gitops-local
+    monthlyBudget: "25000"
+  ingress:
+    host: spendboard-gitops.local
+  hpa:
+    enabled: false
+  serviceMonitor:
+    enabled: true

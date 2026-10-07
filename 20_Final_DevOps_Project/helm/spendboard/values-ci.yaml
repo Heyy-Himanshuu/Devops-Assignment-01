@@ -1,0 +1,13 @@
+# Ephemeral kind cluster inside the GitHub Actions runner (no ingress controller, no Prometheus).
+backend:
+  replicas: 2
+frontend:
+  replicas: 2
+config:
+  environment: ci
+ingress:
+  enabled: false
+hpa:
+  enabled: true
+serviceMonitor:
+  enabled: false

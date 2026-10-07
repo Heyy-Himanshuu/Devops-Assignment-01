@@ -1,0 +1,78 @@
+{{- $fullname := include "spendboard.fullname" . -}}
+{{- $image := printf "%s:%s" .Values.image.backend (include "spendboard.tag" .) -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-backend
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.backend.replicas }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "spendboard.selector" (dict "root" . "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "spendboard.selector" (dict "root" . "component" "backend") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Schema migration runs before the API starts. Retries until Postgres accepts
+        # connections; a Postgres advisory lock in alembic/env.py serialises concurrent Pods.
+        - name: migrate
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "until alembic upgrade head; do echo 'database not ready - retrying in 3s'; sleep 3; done"]
+          envFrom: [{ configMapRef: { name: {{ $fullname }}-config } }]
+          env: &dbenv
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.database.existingSecret }}, key: {{ .Values.database.passwordKey }} }
+            - name: DATABASE_URL
+              value: "postgresql+psycopg://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):5432/$(DB_NAME)"
+          {{- include "spendboard.podSecurity" . | nindent 10 }}
+      containers:
+        - name: backend
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ name: http, containerPort: 8000 }]
+          envFrom: [{ configMapRef: { name: {{ $fullname }}-config } }]
+          env: *dbenv
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: {{ .Values.backend.probes.readinessPath }}, port: http }
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: {{ .Values.backend.probes.livenessPath }}, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-backend
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector: {{- include "spendboard.selector" (dict "root" . "component" "backend") | nindent 4 }}
+  ports:
+    - { name: http, port: 8000, targetPort: http }

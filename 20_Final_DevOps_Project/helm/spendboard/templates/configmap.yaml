@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "spendboard.fullname" . }}-config
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.config.environment | quote }}
+  CURRENCY: {{ .Values.config.currency | quote }}
+  MONTHLY_BUDGET: {{ .Values.config.monthlyBudget | quote }}
+  DB_HOST: {{ include "spendboard.fullname" . }}-postgres
+  DB_NAME: {{ .Values.database.name | quote }}
+  DB_USER: {{ .Values.database.user | quote }}

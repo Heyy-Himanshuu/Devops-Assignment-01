@@ -1,0 +1,26 @@
+{{- $fullname := include "spendboard.fullname" . -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $fullname }}-smoke-test
+  labels: {{- include "spendboard.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  securityContext: { runAsNonRoot: true, runAsUser: 101, seccompProfile: { type: RuntimeDefault } }
+  containers:
+    - name: smoke
+      image: {{ printf "%s:%s" .Values.image.frontend (include "spendboard.tag" .) }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command: ["sh", "-c"]
+      args:
+        - |
+          set -e
+          wget -qO- http://{{ $fullname }}-backend:8000/ready
+          echo; wget -qO- http://{{ $fullname }}-frontend/api/expenses/summary
+          echo; wget -qO- http://{{ $fullname }}-frontend/ | grep -q '<div id="root">' && echo "frontend serves the SPA"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities: { drop: ["ALL"] }

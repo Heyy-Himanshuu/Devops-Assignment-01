@@ -1,0 +1,6 @@
+SpendBoard {{ .Values.image.tag }} deployed to namespace {{ .Release.Namespace }}.
+{{- if .Values.ingress.enabled }}
+  UI:  http://{{ .Values.ingress.host }}/          API: http://{{ .Values.ingress.host }}/api/expenses
+{{- end }}
+  kubectl -n {{ .Release.Namespace }} get deploy,pods,svc,hpa,ingress
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

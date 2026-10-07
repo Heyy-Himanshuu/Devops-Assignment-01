@@ -1,0 +1,276 @@
+# Session 21 - Final DevOps project: SpendBoard (20_Final_DevOps_Project/)
+#
+#  test (backend, frontend) -> [ SAST | SCA | secret scan ] -> docker build (amd64+arm64)
+#    -> image scan -> security gate -> push to GHCR -> Helm deploy + smoke test on kind
+#    -> GitOps: bump the image tag in gitops/, which Argo CD then syncs to the long-lived cluster
+#
+# GitHub only runs workflows from the repository root's .github/workflows/, which is why this
+# file lives here and not inside 20_Final_DevOps_Project/.
+name: "S21 Final - SpendBoard"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "20_Final_DevOps_Project/**"
+      - "!20_Final_DevOps_Project/gitops/**"        # tag bumps written by this workflow
+      - "!20_Final_DevOps_Project/**/*.md"
+      - "!20_Final_DevOps_Project/**/screenshots/**"
+      - ".github/workflows/s21-final.yml"
+  pull_request:
+    paths: ["20_Final_DevOps_Project/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s21-final-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ROOT: 20_Final_DevOps_Project
+  REGISTRY: ghcr.io/heyy-himanshuu
+  PLATFORMS: linux/amd64,linux/arm64
+  TRIVY: aquasec/trivy:0.67.2
+  GITLEAKS: zricethezav/gitleaks:v8.28.0
+
+jobs:
+  backend-test:
+    name: 1a. Backend - lint + unit tests
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: 20_Final_DevOps_Project/application/backend } }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: "20_Final_DevOps_Project/application/backend/requirements*.txt" }
+      - run: pip install -r requirements-dev.txt
+      - name: ruff (lint + format check)
+        run: ruff check . && ruff format --check .
+      - name: pytest (sqlite test DB - never the real database)
+        run: pytest -v --cov=app --cov-report=term-missing --junitxml=reports/junit.xml
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with: { name: backend-test-report, path: "${{ env.ROOT }}/application/backend/reports/" }
+
+  frontend-test:
+    name: 1b. Frontend - tests + build
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: 20_Final_DevOps_Project/application/frontend } }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "22", cache: npm, cache-dependency-path: "20_Final_DevOps_Project/application/frontend/package-lock.json" }
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v5
+        with: { name: frontend-dist, path: "${{ env.ROOT }}/application/frontend/dist/", retention-days: 3 }
+
+  sast:
+    name: 2. SAST (Bandit)
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: 20_Final_DevOps_Project } }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - run: pip install bandit==1.9.4
+      - name: Full report (never fails)
+        run: bandit -c security/bandit.yaml -r application/backend/app --exit-zero
+      - name: Gate - fail on HIGH severity
+        run: bandit -c security/bandit.yaml -r application/backend/app --severity-level high
+
+  sca:
+    name: 3. SCA (pip-audit + Trivy fs)
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: 20_Final_DevOps_Project } }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - name: pip-audit (PyPI / OSV advisories)
+        run: pip install pip-audit==2.10.1 && pip-audit -r application/backend/requirements.txt --desc
+      - name: Trivy fs (requirements.txt + package-lock.json)
+        run: docker run --rm -v "$PWD":/src -w /src $TRIVY fs --config security/trivy.yaml --ignorefile security/.trivyignore application
+
+  secret-scan:
+    name: 4. Secret scan (Gitleaks)
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }   # every commit that ever touched the project, not just HEAD
+      - name: Gitleaks over the project's git history
+        run: |
+          docker run --rm -v "$PWD":/repo -w /repo $GITLEAKS git \
+            --config $ROOT/security/gitleaks.toml --log-opts="-- $ROOT" --redact --verbose .
+
+  docker-build:
+    name: 5. Docker build (${{ matrix.component }})
+    needs: [sast, sca, secret-scan]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build multi-arch image into an OCI archive (the exact bytes that get scanned and pushed)
+        run: |
+          docker buildx build --platform "$PLATFORMS" \
+            -f $ROOT/docker/${{ matrix.component }}.Dockerfile \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            --output type=oci,dest=/tmp/${{ matrix.component }}.tar \
+            $ROOT/application/${{ matrix.component }}
+          ls -lh /tmp/${{ matrix.component }}.tar
+      - uses: actions/upload-artifact@v5
+        with: { name: "image-${{ matrix.component }}", path: "/tmp/${{ matrix.component }}.tar", retention-days: 1 }
+
+  image-scan:
+    name: 6. Image scan (${{ matrix.component }})
+    needs: docker-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with: { name: "image-${{ matrix.component }}", path: /tmp }
+      - name: Trivy - both platforms (HIGH/CRITICAL with a fix available fails the job)
+        run: |
+          for platform in linux/amd64 linux/arm64; do
+            echo "::group::$platform"
+            docker run --rm -v /tmp:/tmp -v "$PWD/$ROOT":/src -w /src $TRIVY image --config security/trivy.yaml \
+              --ignorefile security/.trivyignore --platform $platform --input /tmp/${{ matrix.component }}.tar
+            echo "::endgroup::"
+          done
+
+  security-gate:
+    name: 7. Security gate
+    if: always()
+    needs: [backend-test, frontend-test, sast, sca, secret-scan, docker-build, image-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every check must have passed
+        run: |
+          {
+            echo "## Security gate"
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| Backend tests | ${{ needs.backend-test.result }} |"
+            echo "| Frontend tests | ${{ needs.frontend-test.result }} |"
+            echo "| SAST (Bandit) | ${{ needs.sast.result }} |"
+            echo "| SCA (pip-audit, Trivy fs) | ${{ needs.sca.result }} |"
+            echo "| Secret scan (Gitleaks) | ${{ needs.secret-scan.result }} |"
+            echo "| Docker build | ${{ needs.docker-build.result }} |"
+            echo "| Image scan (Trivy) | ${{ needs.image-scan.result }} |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "GATE CLOSED - nothing will be pushed or deployed." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "GATE OPEN - all checks passed." | tee -a "$GITHUB_STEP_SUMMARY"
+
+  push:
+    name: 8. Push to GHCR
+    needs: security-gate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - id: tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v5
+        with: { pattern: "image-*", path: /tmp, merge-multiple: true }
+      - name: Push the scanned OCI archives (all platforms) with skopeo
+        env: { GHCR_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          for c in backend frontend; do
+            for t in ${{ steps.tag.outputs.tag }} latest; do
+              skopeo copy --all --dest-creds "${{ github.actor }}:$GHCR_TOKEN" \
+                oci-archive:/tmp/$c.tar docker://$REGISTRY/spendboard-$c:$t
+            done
+            skopeo inspect --raw --creds "${{ github.actor }}:$GHCR_TOKEN" docker://$REGISTRY/spendboard-$c:${{ steps.tag.outputs.tag }} \
+              | python3 -c 'import sys,json; m=json.load(sys.stdin); print(sys.argv[1], [x["platform"]["architecture"] for x in m.get("manifests", [])])' "spendboard-$c"
+          done
+
+  deploy:
+    name: 9. Deploy with Helm (kind) + smoke test
+    needs: push
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: read }
+    env: { NS: s21-spendboard, TAG: "${{ needs.push.outputs.tag }}" }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: helm/kind-action@v1.12.0
+        with: { cluster_name: s21-ci }
+      - name: metrics-server (so the HPA has data)
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          kubectl -n kube-system patch deploy metrics-server --type=json \
+            -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+      - name: Namespace, DB secret and registry credentials (created here - never committed)
+        env: { GHCR_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          kubectl apply -f $ROOT/kubernetes/namespace.yaml
+          kubectl -n $NS create secret generic spendboard-db --from-literal=password="$(openssl rand -base64 24)"
+          kubectl -n $NS create secret docker-registry ghcr-pull --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} --docker-password="$GHCR_TOKEN"
+      - name: helm upgrade --install (pinned to the pushed SHA tag)
+        run: |
+          helm lint $ROOT/helm/spendboard -f $ROOT/helm/spendboard/values-ci.yaml --set image.tag=$TAG
+          helm upgrade --install spendboard $ROOT/helm/spendboard -n $NS \
+            -f $ROOT/helm/spendboard/values-ci.yaml --set image.tag=$TAG \
+            --set 'image.pullSecrets[0].name=ghcr-pull' --wait --timeout 6m
+          kubectl -n $NS rollout status deploy/spendboard-backend --timeout=180s
+          kubectl -n $NS get deploy,pods,svc,hpa,pvc -o wide
+      - name: helm test (in-cluster smoke test)
+        run: helm test spendboard -n $NS --logs
+      - name: End-to-end through the frontend's nginx proxy
+        run: |
+          kubectl -n $NS port-forward svc/spendboard-frontend 18080:80 >/dev/null 2>&1 &
+          sleep 3
+          curl -fsS http://localhost:18080/healthz
+          curl -fsS -X POST -H 'Content-Type: application/json' \
+            -d '{"title":"CI smoke test","amount":"42.50","category":"OTHER","spent_on":"2026-10-07"}' \
+            http://localhost:18080/api/expenses
+          echo
+          curl -fsS "http://localhost:18080/api/expenses/summary?month=2026-10" | tee /tmp/summary.json
+          python3 -c 'import json; s=json.load(open("/tmp/summary.json")); assert s["count"] >= 1 and float(s["total"]) >= 42.5, s; print("\nsmoke test OK")'
+          kubectl -n $NS get deploy spendboard-backend -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n $NS get pods -o wide
+          kubectl -n $NS describe pods | tail -60
+          kubectl -n $NS get events --sort-by=.lastTimestamp | tail -30
+
+  gitops-bump:
+    name: 10. GitOps - promote tag to gitops/
+    needs: [push, deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    env: { TAG: "${{ needs.push.outputs.tag }}" }
+    steps:
+      - uses: actions/checkout@v5
+      - name: Commit the new image tag; Argo CD notices and syncs
+        run: |
+          f=$ROOT/gitops/environments/local/values.yaml
+          sed -i -E "s/^(    tag: ).*/\1\"$TAG\"/" "$f"
+          git diff --stat
+          if git diff --quiet; then echo "already at $TAG"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "gitops: promote spendboard to $TAG"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin HEAD:main && exit 0; sleep 5; done
+          exit 1

@@ -1,0 +1,9 @@
+# Secret scanning - built-in ruleset (~200 provider patterns + generic high-entropy rule).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Lockfiles hold integrity hashes, not secrets"
+paths = [
+  '''package-lock\.json$''',
+]

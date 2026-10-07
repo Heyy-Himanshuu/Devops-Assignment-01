@@ -1,0 +1,63 @@
+# Default values. Environment-specific overrides live next to this file (values-local.yaml,
+# values-ci.yaml) and in ../../gitops/.
+
+image:
+  # Images are published by .github/workflows/s21-final.yml, tagged with the short git SHA.
+  backend: ghcr.io/heyy-himanshuu/spendboard-backend
+  frontend: ghcr.io/heyy-himanshuu/spendboard-frontend
+  tag: ""                # required - never deploy `latest`
+  pullPolicy: IfNotPresent
+  pullSecrets: []        # e.g. [{ name: ghcr-pull }] while the GHCR packages are private
+
+backend:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 384Mi }
+  probes:
+    readinessPath: /ready
+    livenessPath: /health
+
+frontend:
+  replicas: 2
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+# Non-secret runtime configuration -> ConfigMap -> env vars
+config:
+  environment: kubernetes
+  currency: INR
+  monthlyBudget: "25000"
+
+database:
+  name: spendboard
+  user: spendboard
+  # The password is NEVER stored in this chart or in Git. Create it out of band:
+  #   kubectl -n <ns> create secret generic spendboard-db --from-literal=password="$(openssl rand -base64 24)"
+  existingSecret: spendboard-db
+  passwordKey: password
+
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  storage: 1Gi
+  storageClassName: ""   # "" = cluster default (local-path on kind)
+
+ingress:
+  enabled: true
+  className: nginx
+  host: spendboard.local
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+serviceMonitor:
+  enabled: false
+  # Must match the Prometheus' serviceMonitorSelector (kube-prometheus-stack labels it release=<release name>)
+  labels:
+    release: kps
+  interval: 15s

@@ -1,0 +1,5 @@
+# SAST - bandit -c security/bandit.yaml -r application/backend/app
+# Full report on every run; the gate fails only on HIGH severity (--severity-level high).
+exclude_dirs:
+  - tests
+  - alembic

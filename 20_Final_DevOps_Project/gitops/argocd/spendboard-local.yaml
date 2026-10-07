@@ -1,0 +1,21 @@
+# kubectl apply -f gitops/argocd/spendboard-local.yaml   (once - after that, Git is the only interface)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spendboard-gitops
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Heyy-Himanshuu/Devops-Assignment-01.git
+    targetRevision: main
+    path: 20_Final_DevOps_Project/gitops/environments/local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: s21-gitops
+  syncPolicy:
+    automated:
+      prune: true      # delete what was removed from Git
+      selfHeal: true   # revert manual kubectl changes back to what Git says
+    syncOptions:
+      - CreateNamespace=true

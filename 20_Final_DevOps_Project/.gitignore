@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+reports/
+*.db
+.env
+# Node
+node_modules/
+dist/
+# Helm dependency build output
+charts/
+.ruff_cache/
