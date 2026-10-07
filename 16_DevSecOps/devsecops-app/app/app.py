@@ -231,4 +231,10 @@ def server_error(e):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    # Local development only - the container runs gunicorn (see Dockerfile).
+    # Debug mode exposes the Werkzeug console (arbitrary code execution), so it is opt-in.
+    app.run(
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "5001")),
+        debug=os.environ.get("FLASK_DEBUG") == "1",
+    )
