@@ -1,6 +1,6 @@
 spendboard:
   image:
-    tag: "a1c45ef"
+    tag: "a40fdb0"
   backend:
     replicas: 2
   frontend:
