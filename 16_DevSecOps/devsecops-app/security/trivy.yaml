@@ -2,8 +2,11 @@
 severity:
   - HIGH
   - CRITICAL
-exit-code: 1            # without this Trivy only *reports* - it never fails the job
-ignore-unfixed: true    # a finding with no released fix cannot be acted on yet
+exit-code: 1              # without this Trivy only *reports* - it never fails the job
 scan:
   scanners:
     - vuln
+vulnerability:
+  # Must be nested here: a top-level `ignore-unfixed:` key is silently ignored
+  # (verified - it let 44 unfixable Debian HIGHs fail the first image scan).
+  ignore-unfixed: true    # a finding with no released fix cannot be acted on yet
