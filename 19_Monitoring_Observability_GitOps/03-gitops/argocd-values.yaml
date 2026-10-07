@@ -1,0 +1,16 @@
+# argo/argo-cd chart values for the local kind cluster.
+# helm upgrade --install argocd argo/argo-cd -n argocd --create-namespace -f argocd-values.yaml
+configs:
+  params:
+    server.insecure: true            # plain HTTP behind kubectl port-forward
+    # Local demo only: lets the UI be screenshotted headlessly without a login.
+    # NEVER do this on a reachable cluster - anyone with network access becomes admin.
+    server.disable.auth: true
+  cm:
+    # How often Argo CD polls Git. Default is 180s; 30s keeps the demo short.
+    # Production setups keep the default and add a Git webhook for instant syncs.
+    timeout.reconciliation: 30s
+dex:
+  enabled: false                     # no SSO needed locally
+notifications:
+  enabled: false

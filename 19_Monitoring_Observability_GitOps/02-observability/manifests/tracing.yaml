@@ -1,0 +1,116 @@
+# Traces demo: two podinfo services (frontend -> backend) export OpenTelemetry spans to Jaeger.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: s20-tracing
+---
+# Jaeger v2 all-in-one: OTLP receiver (4317 gRPC / 4318 HTTP) + in-memory storage + UI (16686).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: s20-tracing
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: jaeger}
+  template:
+    metadata:
+      labels: {app: jaeger}
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/jaeger:2.22.0
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+            - {name: ui, containerPort: 16686}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: s20-tracing
+spec:
+  selector: {app: jaeger}
+  ports:
+    - {name: otlp-grpc, port: 4317}
+    - {name: otlp-http, port: 4318}
+    - {name: ui, port: 16686}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: s20-tracing
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: backend}
+  template:
+    metadata:
+      labels: {app: backend}
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.15.0
+          command: ["./podinfo", "--port=9898", "--otel-service-name=backend"]
+          env:
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://jaeger:4317"}
+            - {name: OTEL_EXPORTER_OTLP_INSECURE, value: "true"}
+          ports:
+            - {name: http, containerPort: 9898}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: s20-tracing
+spec:
+  selector: {app: backend}
+  ports:
+    - {name: http, port: 9898}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: s20-tracing
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: frontend}
+  template:
+    metadata:
+      labels: {app: frontend}
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.15.0
+          # --backend-url: POST /echo on the frontend is forwarded to the backend, so one request
+          # produces one trace spanning both services.
+          command: ["./podinfo", "--port=9898", "--otel-service-name=frontend", "--backend-url=http://backend:9898/echo"]
+          env:
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://jaeger:4317"}
+            - {name: OTEL_EXPORTER_OTLP_INSECURE, value: "true"}
+          ports:
+            - {name: http, containerPort: 9898}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: s20-tracing
+spec:
+  selector: {app: frontend}
+  ports:
+    - {name: http, port: 9898}

@@ -1,0 +1,25 @@
+# Applied once, by hand, from outside the watched path. If this file lived inside app/, Argo CD
+# would render it as one of the workload's own manifests and end up managing itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: session20-mini
+  namespace: argocd
+  # Without this finalizer, deleting the Application only deletes the Application object and
+  # leaves every Deployment/Service it created running, orphaned. With it, Argo CD deletes
+  # the managed resources first (cascading delete).
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Heyy-Himanshuu/Devops-Assignment-01.git
+    targetRevision: main
+    path: 19_Monitoring_Observability_GitOps/03-gitops/app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: s20-gitops
+  syncPolicy:
+    automated:
+      prune: true        # delete cluster objects that were removed from Git
+      selfHeal: true     # undo manual changes made directly in the cluster

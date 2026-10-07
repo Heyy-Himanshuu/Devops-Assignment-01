@@ -1,0 +1,31 @@
+# kube-prometheus-stack 92.1.0 values for the local kind cluster (devops-hw).
+# helm upgrade --install kps prometheus-community/kube-prometheus-stack -n monitoring --version 92.1.0 -f monitoring-values.yaml
+
+grafana:
+  adminPassword: devops-hw          # local throwaway cluster only, never a real password in Git
+  grafana.ini:
+    auth.anonymous:                  # read-only dashboards without a login, so headless screenshots work
+      enabled: true
+      org_role: Viewer
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    # By default Prometheus only picks up ServiceMonitors/PodMonitors/PrometheusRules that carry
+    # this Helm release's label. Setting these to false makes it discover the ones our apps ship.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+# kind's single etcd member only serves metrics on 127.0.0.1:2381. Rebinding it means restarting
+# the cluster's only etcd (API outage) on a cluster other labs share, so its scrape is disabled
+# here instead. kube-scheduler, kube-controller-manager and kube-proxy WERE rebound to 0.0.0.0.
+kubeEtcd:
+  enabled: false
+
+defaultRules:
+  disabled:
+    # kind nodes are containers on the Docker Desktop VM: they share its clock but run no NTP
+    # daemon, so node_timex_sync_status is always 0. A false positive specific to kind.
+    NodeClockNotSynchronising: true

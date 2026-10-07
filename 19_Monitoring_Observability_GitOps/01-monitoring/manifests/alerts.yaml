@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: podinfo-alerts
+  namespace: s20-app
+spec:
+  groups:
+    - name: podinfo
+      rules:
+        # Application health: fewer ready replicas than the Deployment wants.
+        - alert: PodinfoReplicasUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="s20-app",deployment="podinfo"} < kube_deployment_spec_replicas{namespace="s20-app",deployment="podinfo"}
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "podinfo has {{ $value }} available replicas, fewer than desired"
+        # Errors: more than 5% of requests answered with a 5xx over the last minute.
+        # `sum by (namespace)`, not plain `sum`: a bare sum drops every label, so the alert would
+        # carry no namespace and be invisible to anything filtering alerts by namespace.
+        - alert: PodinfoHighErrorRate
+          expr: |
+            sum by (namespace) (rate(http_request_duration_seconds_count{namespace="s20-app",status=~"5.."}[1m]))
+              / sum by (namespace) (rate(http_request_duration_seconds_count{namespace="s20-app"}[1m])) > 0.05
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "podinfo 5xx ratio is {{ $value | humanizePercentage }}"
+        # CPU: a container using more than 80% of its CPU limit.
+        - alert: PodinfoHighCPU
+          expr: |
+            sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="s20-app",container="podinfo"}[1m]))
+              / sum by (pod) (kube_pod_container_resource_limits{namespace="s20-app",container="podinfo",resource="cpu"}) > 0.8
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} is at {{ $value | humanizePercentage }} of its CPU limit"

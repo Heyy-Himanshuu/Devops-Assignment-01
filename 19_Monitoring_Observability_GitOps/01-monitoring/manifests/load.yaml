@@ -1,0 +1,35 @@
+# Traffic generator. ERROR_EVERY=N makes every Nth request hit /status/500 (0 = no errors).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: s20-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.6.0
+          env:
+            - name: ERROR_EVERY
+              value: "0"
+          command:
+            - sh
+            - -c
+            - |
+              i=0
+              while true; do
+                i=$((i+1))
+                if [ "$ERROR_EVERY" -gt 0 ] && [ $((i % ERROR_EVERY)) -eq 0 ]; then
+                  curl -s -o /dev/null http://podinfo.s20-app:9898/status/500
+                else
+                  curl -s -o /dev/null http://podinfo.s20-app:9898/
+                fi
+              done
