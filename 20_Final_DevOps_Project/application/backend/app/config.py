@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     and a Secret (DATABASE_URL), never from values baked into the image."""
 
     app_name: str = "SpendBoard API"
-    app_version: str = "1.0.0"
+    app_version: str = "1.1.0"
     environment: str = "local"
     database_url: str = "sqlite:///./spendboard.db"
     currency: str = "INR"

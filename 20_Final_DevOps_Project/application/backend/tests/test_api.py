@@ -14,6 +14,13 @@ def test_root_reports_service(client):
     assert body["service"] == "SpendBoard API"
 
 
+def test_public_config(client):
+    body = client.get("/api/config").json()
+    assert body["currency"] == "INR"
+    assert body["monthly_budget"] == 10000  # MONTHLY_BUDGET from conftest
+    assert body["version"] == "1.1.0"
+
+
 def test_create_and_get_expense(client):
     created = client.post(
         "/api/expenses",

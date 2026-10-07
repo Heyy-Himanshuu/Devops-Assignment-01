@@ -46,7 +46,12 @@ def ready(db: Session = Depends(get_db)):
 
 @app.get("/api/config")
 def public_config():
-    return {"currency": settings.currency, "monthly_budget": settings.monthly_budget, "environment": settings.environment}
+    return {
+        "currency": settings.currency,
+        "monthly_budget": settings.monthly_budget,
+        "environment": settings.environment,
+        "version": settings.app_version,
+    }
 
 
 @app.get("/api/expenses", response_model=list[ExpenseOut])

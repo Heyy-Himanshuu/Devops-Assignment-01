@@ -84,7 +84,10 @@ function App() {
     <div className="page">
       <header>
         <div>
-          <p className="eyebrow">SPENDBOARD {config.environment && <span className="env">{config.environment}</span>}</p>
+          <p className="eyebrow">
+            SPENDBOARD {config.version && <span className="ver">v{config.version}</span>}
+            {config.environment && <span className="env">{config.environment}</span>}
+          </p>
           <h1>Where did the money go?</h1>
         </div>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month" />
