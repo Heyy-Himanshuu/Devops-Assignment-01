@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: session17-python
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: session17-python
+  template:
+    metadata:
+      labels:
+        app: session17-python
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull                  # created by the deploy job from GITHUB_TOKEN
+      containers:
+        - name: session17-python
+          image: __IMAGE__                 # replaced by the deploy job with ghcr.io/...:<sha>
+          ports:
+            - containerPort: 5001
+          readinessProbe:
+            httpGet: {path: /health, port: 5001}
+            periodSeconds: 3
+          livenessProbe:
+            httpGet: {path: /health, port: 5001}
+            periodSeconds: 10
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false

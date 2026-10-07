@@ -1,0 +1,9 @@
+# Bandit (SAST) configuration - used as: bandit -c security/bandit.yaml -r app
+# The pipeline reports every finding but the gate only fails on HIGH severity
+# (--severity-level high), so medium/low findings are visible without blocking.
+exclude_dirs:
+  - tests
+skips:
+  # B311: `random` is not cryptographically secure. Here it only picks a greeting
+  # string and simulates pipeline stage durations - no security decision uses it.
+  - B311

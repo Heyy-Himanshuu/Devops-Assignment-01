@@ -1,0 +1,9 @@
+# Trivy configuration shared by the SCA (fs) and image scans: trivy --config security/trivy.yaml ...
+severity:
+  - HIGH
+  - CRITICAL
+exit-code: 1            # without this Trivy only *reports* - it never fails the job
+ignore-unfixed: true    # a finding with no released fix cannot be acted on yet
+scan:
+  scanners:
+    - vuln
