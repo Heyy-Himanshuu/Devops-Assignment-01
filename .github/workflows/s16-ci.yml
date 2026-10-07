@@ -1,0 +1,106 @@
+# Session 16 - Continuous Integration for 15_CICD_GitHub_Actions/calculator-app
+name: "S16 CI - calculator"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "15_CICD_GitHub_Actions/calculator-app/**"
+      - ".github/workflows/s16-ci.yml"
+  pull_request:
+    paths:
+      - "15_CICD_GitHub_Actions/calculator-app/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: 15_CICD_GitHub_Actions/calculator-app
+
+jobs:
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install flake8==7.3.0
+      - run: flake8 app tests
+
+  test:
+    name: Test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: 15_CICD_GitHub_Actions/calculator-app/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run pytest
+        run: pytest -v --cov=app --cov-report=term-missing --junitxml=test-results.xml
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-py${{ matrix.python }}
+          path: 15_CICD_GitHub_Actions/calculator-app/test-results.xml
+
+  security-check:
+    name: Basic security check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if key or env files are committed
+        run: |
+          found=$(find . \( -name '.env' -o -name '*.pem' -o -name '*.key' \) -print)
+          if [ -n "$found" ]; then echo "Sensitive files committed:"; echo "$found"; exit 1; fi
+          echo "No .env / .pem / .key files found."
+
+  secrets-demo:
+    name: Using secrets
+    runs-on: ubuntu-latest
+    steps:
+      # Secrets are passed to a step through env and used, never echoed.
+      - name: Authenticated API call with the automatic GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fsS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}" | jq '{full_name, visibility, default_branch}'
+      - name: Optional repository secret (Settings -> Secrets and variables -> Actions)
+        env:
+          DEMO_API_KEY: ${{ secrets.DEMO_API_KEY }}
+        run: |
+          if [ -n "$DEMO_API_KEY" ]; then echo "DEMO_API_KEY is configured."; else echo "DEMO_API_KEY is not configured - unset secrets resolve to an empty string."; fi
+
+  build:
+    name: Build & upload artifact
+    needs: [lint, test, security-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package application
+        run: ./build.sh
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calculator-build
+          path: 15_CICD_GitHub_Actions/calculator-app/build/
+          retention-days: 30
+      - name: Build Docker image (not pushed - CD does that)
+        run: |
+          docker build --build-arg APP_VERSION=${GITHUB_SHA::7} -t calculator:ci .
+          docker run -d --name calc -p 8000:8000 calculator:ci
+          sleep 3
+          curl -fsS http://localhost:8000/
+          curl -fsS "http://localhost:8000/api/multiply?a=6&b=7"

@@ -1,0 +1,73 @@
+# Session 16 - Continuous Delivery/Deployment: runs only after S16 CI succeeded on main
+name: "S16 CD - calculator"
+
+on:
+  workflow_run:
+    workflows: ["S16 CI - calculator"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/heyy-himanshuu/s16-calculator
+  APP_DIR: 15_CICD_GitHub_Actions/calculator-app
+
+jobs:
+  publish:
+    name: Build & push image to GHCR
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: meta
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        run: |
+          docker build --build-arg APP_VERSION=${{ steps.meta.outputs.tag }} \
+            -t $IMAGE:${{ steps.meta.outputs.tag }} -t $IMAGE:latest $APP_DIR
+          docker push $IMAGE:${{ steps.meta.outputs.tag }}
+          docker push $IMAGE:latest
+
+  deploy:
+    name: Deploy to Kubernetes (kind)
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Create an ephemeral kind cluster on the runner
+        uses: helm/kind-action@v1.12.0
+      - name: Registry credentials for the cluster (from GITHUB_TOKEN)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          kubectl create secret docker-registry ghcr-pull --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} --docker-password="$GHCR_TOKEN"
+      - name: Apply manifests with the freshly pushed tag
+        run: |
+          sed -i "s|__IMAGE__|$IMAGE:${{ needs.publish.outputs.tag }}|" $APP_DIR/k8s/deployment.yaml
+          kubectl apply -f $APP_DIR/k8s/
+          kubectl rollout status deployment/calculator --timeout=120s
+          kubectl get deploy,rs,pods,svc -o wide
+      - name: Smoke test through the Service
+        run: |
+          kubectl port-forward svc/calculator 8080:80 >/dev/null 2>&1 &
+          sleep 3
+          curl -fsS http://localhost:8080/
+          curl -fsS http://localhost:8080/health
+          curl -fsS "http://localhost:8080/api/divide?a=84&b=2"
