@@ -24,8 +24,8 @@ jobs:
     name: Lint (flake8)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install flake8==7.3.0
@@ -38,8 +38,8 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -50,7 +50,7 @@ jobs:
         run: pytest -v --cov=app --cov-report=term-missing --junitxml=test-results.xml
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-report-py${{ matrix.python }}
           path: 15_CICD_GitHub_Actions/calculator-app/test-results.xml
@@ -59,7 +59,7 @@ jobs:
     name: Basic security check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fail if key or env files are committed
         run: |
           found=$(find . \( -name '.env' -o -name '*.pem' -o -name '*.key' \) -print)
@@ -69,6 +69,9 @@ jobs:
   secrets-demo:
     name: Using secrets
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .   # no checkout in this job, so the app folder does not exist here
     steps:
       # Secrets are passed to a step through env and used, never echoed.
       - name: Authenticated API call with the automatic GITHUB_TOKEN
@@ -88,11 +91,11 @@ jobs:
     needs: [lint, test, security-check]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Package application
         run: ./build.sh
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: calculator-build
           path: 15_CICD_GitHub_Actions/calculator-app/build/
