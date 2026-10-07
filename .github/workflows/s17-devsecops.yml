@@ -216,6 +216,12 @@ jobs:
           kubectl rollout status deployment/session17-python --timeout=180s
           kubectl get deploy,rs,pods,svc -o wide
           kubectl get deploy session17-python -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+      - name: Diagnostics if the rollout failed
+        if: failure()
+        run: |
+          kubectl get pods -o wide
+          kubectl describe pods -l app=session17-python | tail -30
+          kubectl get events --sort-by=.lastTimestamp | tail -20
       - name: Smoke test through the Service
         run: |
           kubectl port-forward svc/session17-python 5001:80 >/dev/null 2>&1 &
