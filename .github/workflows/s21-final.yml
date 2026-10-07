@@ -145,10 +145,13 @@ jobs:
         with: { name: "image-${{ matrix.component }}", path: /tmp }
       - name: Trivy - both platforms (HIGH/CRITICAL with a fix available fails the job)
         run: |
+          # `trivy image --input` reads a docker-save tar or an OCI *layout directory*, not an OCI
+          # archive tarball (first run failed: "index.json: not a directory") - so unpack it first.
+          mkdir -p /tmp/oci && tar -xf /tmp/${{ matrix.component }}.tar -C /tmp/oci
           for platform in linux/amd64 linux/arm64; do
             echo "::group::$platform"
             docker run --rm -v /tmp:/tmp -v "$PWD/$ROOT":/src -w /src $TRIVY image --config security/trivy.yaml \
-              --ignorefile security/.trivyignore --platform $platform --input /tmp/${{ matrix.component }}.tar
+              --ignorefile security/.trivyignore --platform $platform --input /tmp/oci
             echo "::endgroup::"
           done
 
