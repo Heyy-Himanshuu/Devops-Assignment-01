@@ -1,0 +1,15 @@
+# Issue 6 (fixed): reference the Service port by *name*, so the Ingress follows the chart if the
+# container port ever changes - this is what helm/spendboard/templates/ingress.yaml does.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: course-style
+  namespace: s21-spendboard
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: course.spendboard.local
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: spendboard-backend, port: { name: http } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: spendboard-frontend, port: { name: http } } } }

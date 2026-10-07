@@ -1,0 +1,23 @@
+# The values the shared kube-prometheus-stack release ("kps", namespace monitoring) runs with on the
+# devops-hw kind cluster - installed in Session 20, reused here, not reinstalled:
+#   helm upgrade --install kps prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f kube-prometheus-stack-values.yaml
+# The *NilUsesHelmValues: false settings make Prometheus pick up ServiceMonitors / PrometheusRules from
+# every namespace regardless of labels - the course chart instead hardcoded `release: kube-prometheus-stack`,
+# which silently matches nothing when the release has any other name.
+defaultRules:
+  disabled:
+    NodeClockNotSynchronising: true
+grafana:
+  grafana.ini:
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+kubeEtcd:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    evaluationInterval: 15s
+    scrapeInterval: 15s
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false

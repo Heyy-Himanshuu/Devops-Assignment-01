@@ -1,0 +1,16 @@
+# Issue 6 (broken): the course's TaskBoard chart Ingress, ported 1:1 to SpendBoard names.
+# It hardcodes a backend Service name and port 8080 - but Helm names the Service
+# <release>-...-backend and it listens on 8000.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: course-style
+  namespace: s21-spendboard
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: course.spendboard.local
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: spendboard-backend, port: { number: 8080 } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: spendboard-frontend, port: { number: 80 } } } }

@@ -1,0 +1,34 @@
+# Alerts for SpendBoard. Picked up by the kube-prometheus-stack Prometheus (ruleSelector matches all).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: spendboard
+  namespace: s21-spendboard
+  labels:
+    release: kps
+spec:
+  groups:
+    - name: spendboard.rules
+      rules:
+        - alert: SpendBoardBackendDown
+          expr: sum(up{job="spendboard-backend",namespace="s21-spendboard"}) == 0
+          for: 1m
+          labels: { severity: critical }
+          annotations:
+            summary: No SpendBoard backend Pod is being scraped successfully
+        - alert: SpendBoardHighClientErrorRate
+          # 4xx share of all API traffic over 5 minutes
+          expr: |
+            sum(rate(http_requests_total{job="spendboard-backend",status="4xx"}[5m]))
+              / sum(rate(http_requests_total{job="spendboard-backend"}[5m])) > 0.25
+          for: 2m
+          labels: { severity: warning }
+          annotations:
+            summary: More than 25% of SpendBoard API requests are failing validation / not found
+        - alert: SpendBoardSlowRequests
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="spendboard-backend"}[5m]))) > 0.5
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: SpendBoard API p95 latency above 500 ms
