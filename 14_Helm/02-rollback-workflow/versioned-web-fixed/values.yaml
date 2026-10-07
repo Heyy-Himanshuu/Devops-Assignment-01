@@ -1,0 +1,14 @@
+replicaCount: 2
+
+image:
+  repository: nginx
+  tag: "1.24"
+
+# Rendered into the served page, so `curl` tells you exactly which values are live.
+release:
+  version: v1
+  message: "first release"
+  color: "#3b82f6"
+
+service:
+  port: 80

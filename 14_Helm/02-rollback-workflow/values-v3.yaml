@@ -1,0 +1,7 @@
+replicaCount: 3
+image:
+  tag: "1.26"
+release:
+  version: v3
+  message: "third release - the one we will roll back"
+  color: "#dc2626"

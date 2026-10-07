@@ -1,0 +1,65 @@
+diff -ru course/notes-chart/Chart.yaml notes-chart/Chart.yaml
+--- course/notes-chart/Chart.yaml	2026-10-07 21:44:55
++++ notes-chart/Chart.yaml	2026-10-07 22:26:31
+@@ -2,5 +2,5 @@
+ name: notes-chart
+ description: A simple Notes application Helm chart
+ type: application
+-version: 0.1.0
++version: 0.1.1
+ appVersion: "1.0"
+diff -ru course/notes-chart/templates/deployment.yaml notes-chart/templates/deployment.yaml
+--- course/notes-chart/templates/deployment.yaml	2026-10-07 21:44:55
++++ notes-chart/templates/deployment.yaml	2026-10-07 22:26:31
+@@ -14,6 +14,10 @@
+     metadata:
+       labels:
+         app: {{ .Release.Name }}
++      annotations:
++        # envFrom is read only when the container starts. Hashing the ConfigMap into the
++        # Pod template makes a config-only upgrade roll the Pods so they pick it up.
++        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+     spec:
+       containers:
+         - name: notes
+diff -ru course/notes-chart/templates/service.yaml notes-chart/templates/service.yaml
+--- course/notes-chart/templates/service.yaml	2026-10-07 21:44:55
++++ notes-chart/templates/service.yaml	2026-10-07 22:26:31
+@@ -9,4 +9,6 @@
+   ports:
+     - port: {{ .Values.service.port }}
+       targetPort: {{ .Values.service.port }}
+-      nodePort: {{ .Values.service.nodePort }}
++      {{- with .Values.service.nodePort }}
++      nodePort: {{ . }}
++      {{- end }}
+diff -ru course/notes-chart/values-prod.yaml notes-chart/values-prod.yaml
+--- course/notes-chart/values-prod.yaml	2026-10-07 21:44:55
++++ notes-chart/values-prod.yaml	2026-10-07 22:26:31
+@@ -6,7 +6,10 @@
+ 
+ service:
+   port: 80
+-  nodePort: 30090
++  # Left empty, Kubernetes picks a free port. A fixed nodePort is cluster-wide, so a
++  # second release of this chart (e.g. notes-prod next to notes-dev) would collide.
++  # Pin one only when needed: --set service.nodePort=30090
++  nodePort: ""
+ 
+ app:
+   name: notes-app
+diff -ru course/notes-chart/values.yaml notes-chart/values.yaml
+--- course/notes-chart/values.yaml	2026-10-07 21:44:55
++++ notes-chart/values.yaml	2026-10-07 22:26:31
+@@ -6,7 +6,10 @@
+ 
+ service:
+   port: 80
+-  nodePort: 30090
++  # Left empty, Kubernetes picks a free port. A fixed nodePort is cluster-wide, so a
++  # second release of this chart (e.g. notes-prod next to notes-dev) would collide.
++  # Pin one only when needed: --set service.nodePort=30090
++  nodePort: ""
+ 
+ app:
+   name: notes-app

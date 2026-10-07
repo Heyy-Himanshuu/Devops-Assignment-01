@@ -1,0 +1,16 @@
+replicaCount: 3
+
+image:
+  repository: nginx
+  tag: "1.25"
+
+service:
+  port: 80
+  # Left empty, Kubernetes picks a free port. A fixed nodePort is cluster-wide, so a
+  # second release of this chart (e.g. notes-prod next to notes-dev) would collide.
+  # Pin one only when needed: --set service.nodePort=30090
+  nodePort: ""
+
+app:
+  name: notes-app
+  environment: production

@@ -1,0 +1,6 @@
+image:
+  tag: "1.25"
+release:
+  version: v2
+  message: "second release - new image and new page"
+  color: "#16a34a"
