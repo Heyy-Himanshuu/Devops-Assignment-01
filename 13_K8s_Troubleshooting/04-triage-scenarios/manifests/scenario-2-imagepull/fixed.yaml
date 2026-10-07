@@ -1,0 +1,15 @@
+# Fix: "yatri-api-service" does not exist on Docker Hub at any tag (and an image
+# with no registry prefix means docker.io/library/<name>). The course gives no real
+# image for this service, so a known-good published image stands in for it here.
+# In a real incident: find the correct name:tag in your registry/CI output.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-2-imagepull-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: imagepull
+spec:
+  containers:
+    - name: web-app
+      image: nginx:alpine

@@ -1,0 +1,13 @@
+# Fixed version of service.yaml: the selector must equal the Pod template label
+# of deployment.yaml (app: web). The course file had app: web-ahsgdf.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

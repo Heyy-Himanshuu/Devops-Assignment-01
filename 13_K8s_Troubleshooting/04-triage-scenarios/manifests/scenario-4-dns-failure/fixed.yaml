@@ -1,0 +1,26 @@
+# Fix 1: the hostname must be <service>.<namespace>.svc.cluster.local of a Service
+#        that exists: postgres-db in s14-triage (was postgres-db-wrong-name.production).
+# Fix 2: the original script hid the failure (curl -s ... || true) and then slept,
+#        so the Pod sat in Running while broken. Now a failed check exits non-zero,
+#        which makes the problem visible as a restart instead of a silent "Running".
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-4-dns-failure-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: dns-failure
+spec:
+  containers:
+    - name: client
+      image: curlimages/curl:8.6.0
+      command: ["sh", "-c"]
+      args:
+        - |
+          DB=postgres-db.s14-triage.svc.cluster.local
+          echo "Attempting connection to internal database $DB:5432 ..."
+          nslookup "$DB" | tail -2 || exit 1
+          nc -z -w 3 "$DB" 5432 || { echo "FATAL: cannot reach $DB:5432"; exit 1; }
+          echo "Database reachable."
+          echo "Process sleeping..."
+          sleep 3600

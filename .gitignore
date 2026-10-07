@@ -10,3 +10,6 @@ build/
 
 # artefact created by 02_shell_scripting/shellscript.sh
 02_shell_scripting/hello/
+
+# raw text captured alongside each screenshot by tools/snap.py
+**/screenshots/*.txt

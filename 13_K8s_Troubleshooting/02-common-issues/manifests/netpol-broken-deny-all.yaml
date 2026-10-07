@@ -1,0 +1,12 @@
+# Written for this lab: a pod-networking issue.
+# Someone added a "default deny" policy to lock the namespace down. It selects
+# every Pod ({}) and allows no ingress, so all Pod-to-Pod traffic is dropped -
+# Pods are Running, the Service has endpoints and DNS resolves, yet curl times out.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress

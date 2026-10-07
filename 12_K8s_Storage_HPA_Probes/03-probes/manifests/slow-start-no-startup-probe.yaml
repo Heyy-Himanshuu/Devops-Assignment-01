@@ -1,0 +1,18 @@
+# Simulates an app that needs 30s to boot (sleep 30 before nginx starts).
+# Only a liveness probe: it starts checking at once, fails 3x (15s) and kills
+# the container before it ever finishes booting -> endless restarts.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: slow-no-startup
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      command: ["sh", "-c", "sleep 30; exec nginx -g 'daemon off;'"]
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 80
+        periodSeconds: 5
+        failureThreshold: 3

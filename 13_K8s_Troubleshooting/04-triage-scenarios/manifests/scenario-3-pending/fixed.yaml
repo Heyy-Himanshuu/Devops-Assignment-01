@@ -1,0 +1,20 @@
+# Fix: requests sized to what nginx actually uses (and what a node can offer).
+# Requests are what the scheduler reserves; limits cap what the container may use.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-3-pending-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: pending
+spec:
+  containers:
+    - name: hungry-app
+      image: nginx:alpine
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 128Mi

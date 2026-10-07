@@ -1,0 +1,7 @@
+# Terraform working directory, state and plan files are never committed:
+# state holds resource IDs (and, in real projects, secrets).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log

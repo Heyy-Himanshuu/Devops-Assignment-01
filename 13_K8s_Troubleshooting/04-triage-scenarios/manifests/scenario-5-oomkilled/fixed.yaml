@@ -1,0 +1,30 @@
+# Fix: the job really needs ~1 GiB (100 x 10 MiB chunks kept in a list), so the
+# limit is raised to fit it with headroom, and a matching request is set so the
+# scheduler reserves that memory. restartPolicy OnFailure: it is a one-shot task.
+# (In real life the other option is fixing the leak - not keeping every chunk.)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-5-oomkilled-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: oomkilled
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: memory-leaker
+      image: python:3.11-alpine
+      command:
+        - "python3"
+        - "-c"
+        - |
+          print("Allocating memory rapidly...")
+          chunks = []
+          for i in range(100):
+              chunks.append(b"x" * (10 * 1024 * 1024))
+          print(f"Done: holding {len(chunks) * 10} MiB without being killed")
+      resources:
+        requests:
+          memory: "1200Mi"
+        limits:
+          memory: "1200Mi"

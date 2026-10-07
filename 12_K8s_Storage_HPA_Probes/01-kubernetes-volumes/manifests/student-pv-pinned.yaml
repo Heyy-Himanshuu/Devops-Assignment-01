@@ -1,0 +1,26 @@
+# Fixed version of student-pv.yaml.
+# A hostPath PV is just a directory on ONE node. Without nodeAffinity the scheduler
+# does not know that, so a recreated Pod could land on another node and see an empty
+# directory. nodeAffinity tells the scheduler where the data actually lives.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: student-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /tmp/student-data
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - devops-hw-worker2
